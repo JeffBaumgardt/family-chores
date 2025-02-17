@@ -1,0 +1,87 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Family {
+  id         String         @id @default(uuid())
+  name       String
+  members    FamilyMember[]
+  activities Activity[]
+  chores     Chore[]
+}
+
+model FamilyMember {
+  id          String     @id @default(uuid())
+  authId      String?    @unique @map("auth_id")
+  name        String
+  role        Role       @default(CHILD)
+  points      Int?
+  specialCode String?    @unique @map("special_code")
+  family      Family     @relation(fields: [familyId], references: [id])
+  familyId    String     @map("family_id")
+  chores      Chore[]
+  activities  Activity[] @relation("ChildActivities")
+
+  @@index([familyId])
+  @@index([authId])
+}
+
+model Chore {
+  id           String        @id @default(uuid())
+  name         String
+  points       Int
+  completed    Boolean       @default(false)
+  denied       Boolean       @default(false)
+  assignedTo   FamilyMember? @relation(fields: [assignedToId], references: [id])
+  assignedToId String?       @map("assigned_to_id")
+  optional     Boolean       @default(false)
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamp(6)
+  activities   Activity[]
+  family       Family        @relation(fields: [familyId], references: [id])
+  familyId     String
+
+  @@index([assignedToId])
+  @@index([familyId])
+}
+
+model Activity {
+  id        String   @id @default(cuid())
+  type      String // "CHORE" or "REDEMPTION"
+  status    String   @default("PENDING")
+  timestamp DateTime @default(now())
+  points    Int
+  name      String?  // Make this optional since chores already have names
+
+  // Relations
+  childId  String
+  child    FamilyMember @relation("ChildActivities", fields: [childId], references: [id], onDelete: Cascade)
+  
+  // For chores only
+  choreId String?
+  chore   Chore?  @relation(fields: [choreId], references: [id])
+
+  // Family relation
+  familyId String
+  family   Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
+  @@index([childId])
+  @@index([familyId])
+  @@index([choreId])
+}
+
+enum Role {
+  PARENT
+  CHILD
+}
